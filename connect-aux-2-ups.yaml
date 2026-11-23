@@ -1,0 +1,19 @@
+# Local build of the AUX-2 core configuration plus USB HID UPS monitoring.
+# Like an adopted config, it leaves out the factory overlay (Improv,
+# provisioning, signed http_request OTA) and keeps network OTA, so after the
+# first USB flash it can be updated with `esphome run` over the network.
+packages:
+  core: !include packages/aux-2.yaml
+  ups: !include packages/ups.yaml
+
+esphome:
+  name: connect-aux-2
+
+substitutions:
+  ups_protocol: cyberpower  # CP1500; the hometheater-ups config uses the same
+
+# Adopted configs supply Wi-Fi credentials (the factory build gets them from
+# Improv). Ethernet stays the preferred interface.
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wappw

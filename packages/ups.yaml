@@ -1,0 +1,141 @@
+# USB HID UPS monitoring on the AUX-2's USB-A port.
+#
+# The ups_hid component is vendored in components/ups_hid from
+# github.com/bullshit/esphome-components (commit 39fe49e), with one change:
+# it registers as a client of the USB host library that the core package's
+# usb_host component already installs, instead of installing its own.
+#
+# Channel budget: the ESP32-S3 has eight USB host channels. The core package
+# sizes hub + ZWA-2 + CH343 to use all eight, and a HID UPS needs EP0 plus its
+# interrupt endpoint(s). Plug the UPS straight into the USB-A port, without
+# the other USB devices, or some of them won't enumerate.
+
+substitutions:
+  ups_protocol: auto          # auto, apc, cyberpower or generic
+  ups_update_interval: 10s
+  ups_nominal_power_w: "900"  # CP1500PFCLCD: 900 W; used if the UPS doesn't report it
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [ups_hid]
+
+ups_hid:
+  id: ups_monitor
+  update_interval: ${ups_update_interval}
+  protocol_timeout: 15s
+  protocol: ${ups_protocol}
+  fallback_nominal_voltage: 120V
+
+sensor:
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Battery Level
+    id: ups_battery_level
+    type: battery_level
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Input Voltage
+    id: ups_input_voltage
+    type: input_voltage
+    unit_of_measurement: V
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Output Voltage
+    id: ups_output_voltage
+    type: output_voltage
+    unit_of_measurement: V
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Load
+    id: ups_load_percentage
+    type: load_percent
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Runtime Remaining
+    id: ups_runtime_remaining
+    type: runtime
+    unit_of_measurement: min
+    device_class: duration
+    state_class: measurement
+    accuracy_decimals: 0
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Nominal Real Power
+    id: ups_realpower_nominal
+    type: ups_realpower_nominal
+    unit_of_measurement: W
+    device_class: power
+    entity_category: diagnostic
+    accuracy_decimals: 0
+  - platform: template
+    name: UPS Load Power
+    id: ups_load_power
+    unit_of_measurement: W
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: 30s
+    lambda: |-
+      float load = id(ups_load_percentage).state;
+      if (std::isnan(load)) return NAN;
+      float nominal = id(ups_realpower_nominal).state;
+      if (std::isnan(nominal) || nominal <= 0) nominal = ${ups_nominal_power_w};
+      return nominal * load / 100.0f;
+
+binary_sensor:
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Online
+    type: online
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS On Battery
+    type: on_battery
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Low Battery
+    type: low_battery
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Battery Charging
+    type: charging
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Overload
+    type: overload
+
+text_sensor:
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Status
+    type: status
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Model
+    type: model
+    entity_category: diagnostic
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Manufacturer
+    type: manufacturer
+    entity_category: diagnostic
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: UPS Detected Protocol
+    type: protocol
+    entity_category: diagnostic
